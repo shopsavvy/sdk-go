@@ -1,47 +1,113 @@
 package shopsavvy
 
+// APIMeta contains credit usage info from the API response
+type APIMeta struct {
+	CreditsUsed        int  `json:"credits_used"`
+	CreditsRemaining   int  `json:"credits_remaining"`
+	RateLimitRemaining *int `json:"rate_limit_remaining,omitempty"`
+}
+
 // APIResponse represents a response from the ShopSavvy API
 type APIResponse[T any] struct {
-	Success          bool   `json:"success"`
-	Data             T      `json:"data"`
-	Message          string `json:"message,omitempty"`
-	CreditsUsed      *int   `json:"credits_used,omitempty"`
-	CreditsRemaining *int   `json:"credits_remaining,omitempty"`
+	Success bool    `json:"success"`
+	Data    T       `json:"data"`
+	Message string  `json:"message,omitempty"`
+	Meta    *APIMeta `json:"meta,omitempty"`
+}
+
+// CreditsUsed returns the credits used from the meta object
+func (r *APIResponse[T]) CreditsUsed() int {
+	if r.Meta != nil {
+		return r.Meta.CreditsUsed
+	}
+	return 0
+}
+
+// CreditsRemaining returns the credits remaining from the meta object
+func (r *APIResponse[T]) CreditsRemaining() int {
+	if r.Meta != nil {
+		return r.Meta.CreditsRemaining
+	}
+	return 0
 }
 
 // ProductDetails represents detailed product information
 type ProductDetails struct {
-	ProductID   string            `json:"product_id"`
-	Name        string            `json:"name"`
-	Brand       *string           `json:"brand,omitempty"`
-	Category    *string           `json:"category,omitempty"`
-	ImageURL    *string           `json:"image_url,omitempty"`
-	Barcode     *string           `json:"barcode,omitempty"`
-	ASIN        *string           `json:"asin,omitempty"`
-	Model       *string           `json:"model,omitempty"`
-	MPN         *string           `json:"mpn,omitempty"`
-	Description *string           `json:"description,omitempty"`
-	Identifiers map[string]string `json:"identifiers,omitempty"`
+	Title     string   `json:"title"`
+	ShopSavvy string   `json:"shopsavvy"`
+	Brand     *string  `json:"brand,omitempty"`
+	Category  *string  `json:"category,omitempty"`
+	Images    []string `json:"images,omitempty"`
+	Barcode   *string  `json:"barcode,omitempty"`
+	Amazon    *string  `json:"amazon,omitempty"`
+	Model     *string  `json:"model,omitempty"`
+	MPN       *string  `json:"mpn,omitempty"`
+	Color     *string  `json:"color,omitempty"`
+}
+
+// Name returns the product title (deprecated alias)
+func (p *ProductDetails) Name() string {
+	return p.Title
+}
+
+// ProductID returns the ShopSavvy ID (deprecated alias)
+func (p *ProductDetails) ProductID() string {
+	return p.ShopSavvy
+}
+
+// ASIN returns the Amazon ASIN (deprecated alias)
+func (p *ProductDetails) ASIN() *string {
+	return p.Amazon
+}
+
+// ImageURL returns the first image URL (deprecated alias)
+func (p *ProductDetails) ImageURL() *string {
+	if len(p.Images) > 0 {
+		return &p.Images[0]
+	}
+	return nil
 }
 
 // Offer represents a product offer from a retailer
 type Offer struct {
-	OfferID      string  `json:"offer_id"`
-	Retailer     string  `json:"retailer"`
-	Price        float64 `json:"price"`
-	Currency     string  `json:"currency"`
-	Availability string  `json:"availability"`
-	Condition    string  `json:"condition"`
-	URL          string  `json:"url"`
-	Shipping     *float64 `json:"shipping,omitempty"`
-	LastUpdated  string  `json:"last_updated"`
+	ID           string              `json:"id"`
+	Retailer     *string             `json:"retailer,omitempty"`
+	Price        *float64            `json:"price,omitempty"`
+	Currency     *string             `json:"currency,omitempty"`
+	Availability *string             `json:"availability,omitempty"`
+	Condition    *string             `json:"condition,omitempty"`
+	URL          *string             `json:"URL,omitempty"`
+	Seller       *string             `json:"seller,omitempty"`
+	Timestamp    *string             `json:"timestamp,omitempty"`
+	History      []PriceHistoryEntry `json:"history,omitempty"`
+}
+
+// OfferID returns the offer ID (deprecated alias)
+func (o *Offer) OfferID() string {
+	return o.ID
+}
+
+// OfferURL returns the offer URL (deprecated alias)
+func (o *Offer) OfferURL() *string {
+	return o.URL
+}
+
+// LastUpdated returns the timestamp (deprecated alias)
+func (o *Offer) LastUpdated() *string {
+	return o.Timestamp
+}
+
+// ProductWithOffers represents a product with its current offers
+type ProductWithOffers struct {
+	ProductDetails
+	Offers []Offer `json:"offers"`
 }
 
 // PriceHistoryEntry represents a single price point in history
 type PriceHistoryEntry struct {
-	Date         string `json:"date"`
+	Date         string  `json:"date"`
 	Price        float64 `json:"price"`
-	Availability string `json:"availability"`
+	Availability string  `json:"availability"`
 }
 
 // OfferWithHistory represents an offer with price history
@@ -60,14 +126,79 @@ type ScheduledProduct struct {
 	LastRefreshed *string `json:"last_refreshed,omitempty"`
 }
 
+// UsagePeriod represents the current billing period details
+type UsagePeriod struct {
+	StartDate        string `json:"start_date"`
+	EndDate          string `json:"end_date"`
+	CreditsUsed      int    `json:"credits_used"`
+	CreditsLimit     int    `json:"credits_limit"`
+	CreditsRemaining int    `json:"credits_remaining"`
+	RequestsMade     int    `json:"requests_made"`
+}
+
 // UsageInfo represents API usage and credit information
 type UsageInfo struct {
-	CreditsUsed          int    `json:"credits_used"`
-	CreditsRemaining     int    `json:"credits_remaining"`
-	CreditsTotal         int    `json:"credits_total"`
-	BillingPeriodStart   string `json:"billing_period_start"`
-	BillingPeriodEnd     string `json:"billing_period_end"`
-	PlanName             string `json:"plan_name"`
+	CurrentPeriod   UsagePeriod `json:"current_period"`
+	UsagePercentage float64     `json:"usage_percentage"`
+}
+
+// Deprecated accessors for backward compatibility
+
+// GetCreditsUsed returns credits used (deprecated, use CurrentPeriod.CreditsUsed)
+func (u *UsageInfo) GetCreditsUsed() int {
+	return u.CurrentPeriod.CreditsUsed
+}
+
+// GetCreditsRemaining returns credits remaining (deprecated, use CurrentPeriod.CreditsRemaining)
+func (u *UsageInfo) GetCreditsRemaining() int {
+	return u.CurrentPeriod.CreditsRemaining
+}
+
+// GetCreditsTotal returns credits limit (deprecated, use CurrentPeriod.CreditsLimit)
+func (u *UsageInfo) GetCreditsTotal() int {
+	return u.CurrentPeriod.CreditsLimit
+}
+
+// GetBillingPeriodStart returns billing period start (deprecated, use CurrentPeriod.StartDate)
+func (u *UsageInfo) GetBillingPeriodStart() string {
+	return u.CurrentPeriod.StartDate
+}
+
+// GetBillingPeriodEnd returns billing period end (deprecated, use CurrentPeriod.EndDate)
+func (u *UsageInfo) GetBillingPeriodEnd() string {
+	return u.CurrentPeriod.EndDate
+}
+
+// PaginationInfo represents pagination metadata for search results
+type PaginationInfo struct {
+	Total    int `json:"total"`
+	Limit    int `json:"limit"`
+	Offset   int `json:"offset"`
+	Returned int `json:"returned"`
+}
+
+// ProductSearchResult represents the response from a product search
+type ProductSearchResult struct {
+	Success    bool             `json:"success"`
+	Data       []ProductDetails `json:"data"`
+	Pagination *PaginationInfo  `json:"pagination,omitempty"`
+	Meta       *APIMeta         `json:"meta,omitempty"`
+}
+
+// CreditsUsed returns the credits used from the meta object
+func (r *ProductSearchResult) CreditsUsed() int {
+	if r.Meta != nil {
+		return r.Meta.CreditsUsed
+	}
+	return 0
+}
+
+// CreditsRemaining returns the credits remaining from the meta object
+func (r *ProductSearchResult) CreditsRemaining() int {
+	if r.Meta != nil {
+		return r.Meta.CreditsRemaining
+	}
+	return 0
 }
 
 // ScheduleResponse represents the response from scheduling a product

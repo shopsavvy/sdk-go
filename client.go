@@ -16,7 +16,7 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	fmt.Println(product.Data.Name)
+//	fmt.Println(product.Data[0].Title)
 package shopsavvy
 
 import (
@@ -28,6 +28,9 @@ import (
 
 	"github.com/go-resty/resty/v2"
 )
+
+// Version is the current SDK version
+const Version = "1.0.1"
 
 // Client represents the ShopSavvy Data API client
 type Client struct {
@@ -72,7 +75,7 @@ func NewClient(apiKey string, options ...Option) (*Client, error) {
 		SetTimeout(config.Timeout).
 		SetHeader("Authorization", "Bearer "+config.APIKey).
 		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", "ShopSavvy-Go-SDK/1.0.0").
+		SetHeader("User-Agent", "ShopSavvy-Go-SDK/"+Version).
 		SetError(&APIErrorResponse{}).
 		OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
 			if resp.IsError() {
@@ -109,20 +112,45 @@ func (c *Client) Close() {
 	// resty client doesn't need explicit closing, but we provide this for consistency
 }
 
-// GetProductDetails looks up product details by identifier
-func (c *Client) GetProductDetails(identifier string, format ...string) (*APIResponse[ProductDetails], error) {
+// SearchProducts searches for products by keyword
+func (c *Client) SearchProducts(query string, limit, offset int) (*ProductSearchResult, error) {
 	params := map[string]string{
-		"identifier": identifier,
+		"q": query,
+	}
+	if limit > 0 {
+		params["limit"] = fmt.Sprintf("%d", limit)
+	}
+	if offset > 0 {
+		params["offset"] = fmt.Sprintf("%d", offset)
+	}
+
+	var response ProductSearchResult
+	_, err := c.client.R().
+		SetQueryParams(params).
+		SetResult(&response).
+		Get("/products/search")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+// GetProductDetails looks up product details by identifier
+func (c *Client) GetProductDetails(identifier string, format ...string) (*APIResponse[[]ProductDetails], error) {
+	params := map[string]string{
+		"ids": identifier,
 	}
 	if len(format) > 0 && format[0] != "" {
 		params["format"] = format[0]
 	}
 
-	var response APIResponse[ProductDetails]
+	var response APIResponse[[]ProductDetails]
 	_, err := c.client.R().
 		SetQueryParams(params).
 		SetResult(&response).
-		Get("/products/details")
+		Get("/products")
 
 	if err != nil {
 		return nil, err
@@ -134,7 +162,7 @@ func (c *Client) GetProductDetails(identifier string, format ...string) (*APIRes
 // GetProductDetailsBatch looks up details for multiple products
 func (c *Client) GetProductDetailsBatch(identifiers []string, format ...string) (*APIResponse[[]ProductDetails], error) {
 	params := map[string]string{
-		"identifiers": strings.Join(identifiers, ","),
+		"ids": strings.Join(identifiers, ","),
 	}
 	if len(format) > 0 && format[0] != "" {
 		params["format"] = format[0]
@@ -144,7 +172,7 @@ func (c *Client) GetProductDetailsBatch(identifiers []string, format ...string) 
 	_, err := c.client.R().
 		SetQueryParams(params).
 		SetResult(&response).
-		Get("/products/details")
+		Get("/products")
 
 	if err != nil {
 		return nil, err
@@ -154,9 +182,9 @@ func (c *Client) GetProductDetailsBatch(identifiers []string, format ...string) 
 }
 
 // GetCurrentOffers gets current offers for a product
-func (c *Client) GetCurrentOffers(identifier string, retailer string, format ...string) (*APIResponse[[]Offer], error) {
+func (c *Client) GetCurrentOffers(identifier string, retailer string, format ...string) (*APIResponse[[]ProductWithOffers], error) {
 	params := map[string]string{
-		"identifier": identifier,
+		"ids": identifier,
 	}
 	if retailer != "" {
 		params["retailer"] = retailer
@@ -165,7 +193,7 @@ func (c *Client) GetCurrentOffers(identifier string, retailer string, format ...
 		params["format"] = format[0]
 	}
 
-	var response APIResponse[[]Offer]
+	var response APIResponse[[]ProductWithOffers]
 	_, err := c.client.R().
 		SetQueryParams(params).
 		SetResult(&response).
@@ -179,9 +207,9 @@ func (c *Client) GetCurrentOffers(identifier string, retailer string, format ...
 }
 
 // GetCurrentOffersBatch gets current offers for multiple products
-func (c *Client) GetCurrentOffersBatch(identifiers []string, retailer string, format ...string) (*APIResponse[map[string][]Offer], error) {
+func (c *Client) GetCurrentOffersBatch(identifiers []string, retailer string, format ...string) (*APIResponse[[]ProductWithOffers], error) {
 	params := map[string]string{
-		"identifiers": strings.Join(identifiers, ","),
+		"ids": strings.Join(identifiers, ","),
 	}
 	if retailer != "" {
 		params["retailer"] = retailer
@@ -190,7 +218,7 @@ func (c *Client) GetCurrentOffersBatch(identifiers []string, retailer string, fo
 		params["format"] = format[0]
 	}
 
-	var response APIResponse[map[string][]Offer]
+	var response APIResponse[[]ProductWithOffers]
 	_, err := c.client.R().
 		SetQueryParams(params).
 		SetResult(&response).
@@ -206,9 +234,9 @@ func (c *Client) GetCurrentOffersBatch(identifiers []string, retailer string, fo
 // GetPriceHistory gets price history for a product
 func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer string, format ...string) (*APIResponse[[]OfferWithHistory], error) {
 	params := map[string]string{
-		"identifier":  identifier,
-		"start_date":  startDate,
-		"end_date":    endDate,
+		"ids":        identifier,
+		"start_date": startDate,
+		"end_date":   endDate,
 	}
 	if retailer != "" {
 		params["retailer"] = retailer
@@ -221,7 +249,7 @@ func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer
 	_, err := c.client.R().
 		SetQueryParams(params).
 		SetResult(&response).
-		Get("/products/history")
+		Get("/products/offers/history")
 
 	if err != nil {
 		return nil, err
