@@ -42,7 +42,16 @@ type ProductDetails struct {
 	Amazon    *string  `json:"amazon,omitempty"`
 	Model     *string  `json:"model,omitempty"`
 	MPN       *string  `json:"mpn,omitempty"`
-	Color     *string  `json:"color,omitempty"`
+	Color       *string            `json:"color,omitempty"`
+	TitleShort  *string            `json:"title_short,omitempty"`
+	Slug        *string            `json:"slug,omitempty"`
+	Description *string            `json:"description,omitempty"`
+	Categories  []string           `json:"categories,omitempty"`
+	Attributes  map[string]string  `json:"attributes,omitempty"`
+	Rating      *ProductRating     `json:"rating,omitempty"`
+	Score       *ProductScore      `json:"score,omitempty"`
+	Keywords    []string           `json:"keywords,omitempty"`
+	Identifiers map[string]any     `json:"identifiers,omitempty"`
 }
 
 // Name returns the product title (deprecated alias)
@@ -175,6 +184,116 @@ type PaginationInfo struct {
 	Limit    int `json:"limit"`
 	Offset   int `json:"offset"`
 	Returned int `json:"returned"`
+}
+
+// ProductRating represents an aggregated customer rating
+type ProductRating struct {
+	Value float64 `json:"value"`
+	Count int     `json:"count"`
+}
+
+// ProductScore represents unified expert quality scores (0-100 scale)
+type ProductScore struct {
+	Overall      *float64 `json:"overall,omitempty"`
+	Customer     *float64 `json:"customer,omitempty"`
+	Professional *float64 `json:"professional,omitempty"`
+	Value        *float64 `json:"value,omitempty"`
+	Features     *float64 `json:"features,omitempty"`
+	Reliability  *float64 `json:"reliability,omitempty"`
+}
+
+// Deal represents a shopping deal with expert grading
+type Deal struct {
+	Path         string          `json:"path"`
+	Title        string          `json:"title"`
+	Subtitle     *string         `json:"subtitle,omitempty"`
+	Description  *string         `json:"description,omitempty"`
+	Emoji        *string         `json:"emoji,omitempty"`
+	Grade        DealGrade       `json:"grade"`
+	Pricing      DealPricing     `json:"pricing"`
+	Retailer     DealRetailer    `json:"retailer"`
+	Product      *string         `json:"product,omitempty"`
+	URL          string          `json:"url"`
+	Image        map[string]any  `json:"image,omitempty"`
+	Votes        DealVotes       `json:"votes"`
+	CommentCount int             `json:"comment_count"`
+	Tags         []DealTag       `json:"tags,omitempty"`
+	ExpiresAt    *string         `json:"expires_at,omitempty"`
+	CreatedAt    string          `json:"created_at"`
+}
+
+type DealGrade struct {
+	Letter        string   `json:"letter"`
+	Suffix        *string  `json:"suffix,omitempty"`
+	Value         float64  `json:"value"`
+	Justification *string  `json:"justification,omitempty"`
+}
+
+type DealPricing struct {
+	Current  float64  `json:"current"`
+	Original *float64 `json:"original,omitempty"`
+	Currency string   `json:"currency"`
+}
+
+type DealRetailer struct {
+	Name string `json:"name"`
+}
+
+type DealVotes struct {
+	Upvotes   int `json:"upvotes"`
+	Downvotes int `json:"downvotes"`
+	Score     int `json:"score"`
+}
+
+type DealTag struct {
+	Slug    string `json:"slug"`
+	Display string `json:"display"`
+}
+
+// DealsResponse represents the response from the deals endpoint
+type DealsResponse struct {
+	Success    bool          `json:"success"`
+	Deals      []Deal        `json:"deals"`
+	Pagination DealsPagination `json:"pagination"`
+	Meta       *APIMeta      `json:"meta,omitempty"`
+}
+
+type DealsPagination struct {
+	Total   int  `json:"total"`
+	HasMore bool `json:"has_more"`
+	Limit   int  `json:"limit"`
+	Offset  int  `json:"offset"`
+}
+
+// DealsOptions configures the deals request
+type DealsOptions struct {
+	Sort     string
+	Limit    int
+	Offset   int
+	Category string
+	Retailer string
+	Tag      string
+	MinPrice float64
+	MaxPrice float64
+	Grade    string
+}
+
+// TLDRReview represents an expert product review summary
+type TLDRReview struct {
+	Slug       string        `json:"slug"`
+	Headline   string        `json:"headline"`
+	Pros       []string      `json:"pros"`
+	Cons       []string      `json:"cons"`
+	BottomLine string        `json:"bottom_line"`
+	Scores     *ProductScore `json:"scores,omitempty"`
+}
+
+// ReviewResponse represents the response from the reviews endpoint
+type ReviewResponse struct {
+	Success bool               `json:"success"`
+	Product map[string]string  `json:"product"`
+	Review  *TLDRReview        `json:"review"`
+	Meta    *APIMeta           `json:"meta,omitempty"`
 }
 
 // ProductSearchResult represents the response from a product search

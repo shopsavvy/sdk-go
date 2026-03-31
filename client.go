@@ -30,7 +30,7 @@ import (
 )
 
 // Version is the current SDK version
-const Version = "1.0.1"
+const Version = "1.1.0"
 
 // Client represents the ShopSavvy Data API client
 type Client struct {
@@ -353,6 +353,46 @@ func (c *Client) RemoveProductsFromSchedule(identifiers []string) (*APIResponse[
 		return nil, err
 	}
 
+	return &response, nil
+}
+
+// GetDeals browses current shopping deals with sorting, filtering, and pagination
+func (c *Client) GetDeals(opts *DealsOptions) (*DealsResponse, error) {
+	var response DealsResponse
+	req := c.client.R().SetResult(&response)
+
+	if opts != nil {
+		params := map[string]string{}
+		if opts.Sort != "" { params["sort"] = opts.Sort }
+		if opts.Limit > 0 { params["limit"] = fmt.Sprintf("%d", opts.Limit) }
+		if opts.Offset > 0 { params["offset"] = fmt.Sprintf("%d", opts.Offset) }
+		if opts.Category != "" { params["category"] = opts.Category }
+		if opts.Retailer != "" { params["retailer"] = opts.Retailer }
+		if opts.Tag != "" { params["tag"] = opts.Tag }
+		if opts.MinPrice > 0 { params["min_price"] = fmt.Sprintf("%.2f", opts.MinPrice) }
+		if opts.MaxPrice > 0 { params["max_price"] = fmt.Sprintf("%.2f", opts.MaxPrice) }
+		if opts.Grade != "" { params["grade"] = opts.Grade }
+		req.SetQueryParams(params)
+	}
+
+	_, err := req.Get("/deals")
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+// GetProductReview gets the TLDR review for a product (pros, cons, scores)
+func (c *Client) GetProductReview(identifier string) (*ReviewResponse, error) {
+	var response ReviewResponse
+	_, err := c.client.R().
+		SetQueryParam("id", identifier).
+		SetResult(&response).
+		Get("/products/reviews")
+
+	if err != nil {
+		return nil, err
+	}
 	return &response, nil
 }
 
