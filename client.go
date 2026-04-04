@@ -396,6 +396,35 @@ func (c *Client) GetProductReview(identifier string) (*ReviewResponse, error) {
 	return &response, nil
 }
 
+// BatchLookup looks up multiple products at once
+func (c *Client) BatchLookup(identifiers []string, include []string) (map[string]interface{}, error) {
+	var response map[string]interface{}
+	body := map[string]interface{}{"identifiers": identifiers}
+	if len(include) > 0 {
+		body["include"] = include
+	}
+	_, err := c.client.R().
+		SetBody(body).
+		SetResult(&response).
+		Post("/products/batch")
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetBatchStatus polls for async batch job results
+func (c *Client) GetBatchStatus(batchID string) (map[string]interface{}, error) {
+	var response map[string]interface{}
+	_, err := c.client.R().
+		SetResult(&response).
+		Get("/batch/" + batchID)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // GetUsage gets API usage information
 func (c *Client) GetUsage() (*APIResponse[UsageInfo], error) {
 	var response APIResponse[UsageInfo]
