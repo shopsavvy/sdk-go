@@ -425,6 +425,38 @@ func (c *Client) GetBatchStatus(batchID string) (map[string]interface{}, error) 
 	return response, nil
 }
 
+// CreateWebhook creates a webhook to receive event notifications
+func (c *Client) CreateWebhook(url string, events []string) (map[string]interface{}, error) {
+	var response map[string]interface{}
+	_, err := c.client.R().SetBody(map[string]interface{}{"url": url, "events": events}).SetResult(&response).Post("/webhooks")
+	if err != nil { return nil, err }
+	return response, nil
+}
+
+// ListWebhooks lists all webhooks for the account
+func (c *Client) ListWebhooks() (map[string]interface{}, error) {
+	var response map[string]interface{}
+	_, err := c.client.R().SetResult(&response).Get("/webhooks")
+	if err != nil { return nil, err }
+	return response, nil
+}
+
+// TestWebhook sends a test event to a webhook
+func (c *Client) TestWebhook(webhookID string) (map[string]interface{}, error) {
+	var response map[string]interface{}
+	_, err := c.client.R().SetResult(&response).Post("/webhooks/" + webhookID + "/test")
+	if err != nil { return nil, err }
+	return response, nil
+}
+
+// DeleteWebhook deletes a webhook
+func (c *Client) DeleteWebhook(webhookID string) (map[string]interface{}, error) {
+	var response map[string]interface{}
+	_, err := c.client.R().SetResult(&response).Delete("/webhooks/" + webhookID)
+	if err != nil { return nil, err }
+	return response, nil
+}
+
 // GetUsage gets API usage information
 func (c *Client) GetUsage() (*APIResponse[UsageInfo], error) {
 	var response APIResponse[UsageInfo]
