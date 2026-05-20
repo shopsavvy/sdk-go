@@ -30,7 +30,7 @@ import (
 )
 
 // Version is the current SDK version
-const Version = "1.1.0"
+const Version = "1.1.1"
 
 // Client represents the ShopSavvy Data API client
 type Client struct {
@@ -445,6 +445,29 @@ func (c *Client) ListWebhooks() (map[string]interface{}, error) {
 func (c *Client) TestWebhook(webhookID string) (map[string]interface{}, error) {
 	var response map[string]interface{}
 	_, err := c.client.R().SetResult(&response).Post("/webhooks/" + webhookID + "/test")
+	if err != nil { return nil, err }
+	return response, nil
+}
+
+// UpdateWebhookOptions contains the optional fields for an update_webhook call.
+// At least one field must be non-nil.
+type UpdateWebhookOptions struct {
+	URL      *string
+	Events   *[]string
+	IsActive *bool
+}
+
+// UpdateWebhook updates a webhook. All fields are optional, but at least one of URL, Events, or IsActive must be set.
+func (c *Client) UpdateWebhook(webhookID string, options UpdateWebhookOptions) (map[string]interface{}, error) {
+	if options.URL == nil && options.Events == nil && options.IsActive == nil {
+		return nil, fmt.Errorf("UpdateWebhook requires at least one of URL, Events, or IsActive")
+	}
+	body := map[string]interface{}{}
+	if options.URL != nil { body["url"] = *options.URL }
+	if options.Events != nil { body["events"] = *options.Events }
+	if options.IsActive != nil { body["is_active"] = *options.IsActive }
+	var response map[string]interface{}
+	_, err := c.client.R().SetBody(body).SetResult(&response).Put("/webhooks/" + webhookID)
 	if err != nil { return nil, err }
 	return response, nil
 }
