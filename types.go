@@ -192,14 +192,15 @@ type ProductRating struct {
 	Count int     `json:"count"`
 }
 
-// ProductScore represents unified expert quality scores (0-100 scale)
+// ProductScore represents unified expert quality scores on a 0-1 scale
+// (multiply by 10 or 100 for display). Aspects is keyed by free-form aspect
+// names drawn from the product's professional reviews (e.g. "value",
+// "features", "reliability", "quality") — the set of aspects varies per product.
 type ProductScore struct {
-	Overall      *float64 `json:"overall,omitempty"`
-	Customer     *float64 `json:"customer,omitempty"`
-	Professional *float64 `json:"professional,omitempty"`
-	Value        *float64 `json:"value,omitempty"`
-	Features     *float64 `json:"features,omitempty"`
-	Reliability  *float64 `json:"reliability,omitempty"`
+	Overall      *float64           `json:"overall,omitempty"`
+	Customer     *float64           `json:"customer,omitempty"`
+	Professional *float64           `json:"professional,omitempty"`
+	Aspects      map[string]float64 `json:"aspects,omitempty"`
 }
 
 // Deal represents a shopping deal with expert grading

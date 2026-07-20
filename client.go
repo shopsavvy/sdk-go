@@ -30,7 +30,7 @@ import (
 )
 
 // Version is the current SDK version
-const Version = "1.1.1"
+const Version = "1.2.0"
 
 // Client represents the ShopSavvy Data API client
 type Client struct {
