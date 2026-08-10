@@ -112,17 +112,28 @@ type ProductWithOffers struct {
 	Offers []Offer `json:"offers"`
 }
 
-// PriceHistoryEntry represents a single price point in history
+// PriceHistoryEntry represents a single price point in history.
+//
+// The timestamp field is `timestamp`, matching the parent Offer's own `timestamp` and the
+// real wire shape ({availability, price, timestamp}). Every SDK in the fleet declared it as
+// `date` — a key the API has never sent — until 2026-08-10, and encoding/json does not error
+// on an unmatched key, so this field silently decoded to "" for every consumer
+// (ShopSavvy prospector-audit s28-t2-2).
 type PriceHistoryEntry struct {
-	Date         string  `json:"date"`
+	Timestamp    string  `json:"timestamp"`
 	Price        float64 `json:"price"`
-	Availability string  `json:"availability"`
+	Availability string  `json:"availability,omitempty"`
 }
 
-// OfferWithHistory represents an offer with price history
+// OfferWithHistory represents an offer returned by GetPriceHistory, i.e. one carrying its
+// History array.
+//
+// This used to add a `price_history` field. The API has never sent a key by that name —
+// history has always arrived under `history`, which the embedded Offer already declares — so
+// PriceHistory always unmarshalled to nil. The embedded field is the only one that was ever
+// populated; removing the dead one cannot break working code.
 type OfferWithHistory struct {
 	Offer
-	PriceHistory []PriceHistoryEntry `json:"price_history"`
 }
 
 // ScheduledProduct represents a product that is scheduled for monitoring
