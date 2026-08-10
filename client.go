@@ -233,10 +233,14 @@ func (c *Client) GetCurrentOffersBatch(identifiers []string, retailer string, fo
 
 // GetPriceHistory gets price history for a product
 func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer string, format ...string) (*APIResponse[[]OfferWithHistory], error) {
+	// Wire params are "start"/"end" — what GET /products/offers/history reads,
+	// and what the OpenAPI spec and public docs document. The old
+	// "start_date"/"end_date" names came from the MCP tool's argument
+	// convention (a different interface entirely) and 400'd every call.
 	params := map[string]string{
-		"ids":        identifier,
-		"start_date": startDate,
-		"end_date":   endDate,
+		"ids":   identifier,
+		"start": startDate,
+		"end":   endDate,
 	}
 	if retailer != "" {
 		params["retailer"] = retailer
