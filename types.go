@@ -120,9 +120,13 @@ type ProductWithOffers struct {
 // on an unmatched key, so this field silently decoded to "" for every consumer
 // (ShopSavvy prospector-audit s28-t2-2).
 type PriceHistoryEntry struct {
-	Timestamp    string  `json:"timestamp"`
-	Price        float64 `json:"price"`
-	Availability string  `json:"availability,omitempty"`
+	Timestamp string  `json:"timestamp"`
+	Price     float64 `json:"price"`
+	// Currency is the ISO 4217 code the Price is denominated in. Empty on an archived point
+	// with no recorded currency — never assume an empty value means USD
+	// (ShopSavvy prospector-audit d5-t3-1).
+	Currency     string `json:"currency,omitempty"`
+	Availability string `json:"availability,omitempty"`
 }
 
 // OfferWithHistory represents an offer returned by GetPriceHistory, i.e. one carrying its
