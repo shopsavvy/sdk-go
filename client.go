@@ -231,8 +231,10 @@ func (c *Client) GetCurrentOffersBatch(identifiers []string, retailer string, fo
 	return &response, nil
 }
 
-// GetPriceHistory gets price history for a product
-func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer string, format ...string) (*APIResponse[[]OfferWithHistory], error) {
+// GetPriceHistory gets price history for one or more products (comma-separate identifiers).
+// startDate and endDate are YYYY-MM-DD. Data holds one entry per product found, each with its
+// offers, and each offer with its History points (newest first).
+func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer string, format ...string) (*APIResponse[[]ProductWithOfferHistory], error) {
 	// Wire params are "start"/"end" — what GET /products/offers/history reads,
 	// and what the OpenAPI spec and public docs document. The old
 	// "start_date"/"end_date" names came from the MCP tool's argument
@@ -249,7 +251,7 @@ func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer
 		params["format"] = format[0]
 	}
 
-	var response APIResponse[[]OfferWithHistory]
+	var response APIResponse[[]ProductWithOfferHistory]
 	_, err := c.client.R().
 		SetQueryParams(params).
 		SetResult(&response).

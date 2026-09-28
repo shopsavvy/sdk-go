@@ -130,7 +130,9 @@ type PriceHistoryEntry struct {
 }
 
 // OfferWithHistory represents an offer returned by GetPriceHistory, i.e. one carrying its
-// History array.
+// History array (newest point first). Every Offer field is present; History comes from the
+// embedded Offer and is an empty slice — never an error — for listings with no archived
+// points (eBay listings always have an empty history).
 //
 // This used to add a `price_history` field. The API has never sent a key by that name —
 // history has always arrived under `history`, which the embedded Offer already declares — so
@@ -138,6 +140,20 @@ type PriceHistoryEntry struct {
 // populated; removing the dead one cannot break working code.
 type OfferWithHistory struct {
 	Offer
+}
+
+// ProductWithOfferHistory is one element of GetPriceHistory's Data: a product (every
+// ProductDetails field, same as GetProductDetails) with each of its offers carrying that
+// offer's price history.
+//
+// GetPriceHistory used to decode Data as []OfferWithHistory, i.e. as if the API returned a
+// flat list of offers. It returns one entry PER PRODUCT with the offers nested under
+// `offers` (refinery offerHistory → {...publicProductForProduct, offers: [...]}).
+// encoding/json does not error on unmatched keys, so every element decoded to an Offer with
+// an empty ID and a nil History: the method returned zero price points for every call.
+type ProductWithOfferHistory struct {
+	ProductDetails
+	Offers []OfferWithHistory `json:"offers"`
 }
 
 // ScheduledProduct represents a product that is scheduled for monitoring
