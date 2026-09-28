@@ -20,7 +20,6 @@
 package shopsavvy
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -300,7 +299,8 @@ func (c *Client) ScheduleProductMonitoringBatch(identifiers []string, frequency 
 	return &response, nil
 }
 
-// GetScheduledProducts gets all scheduled products
+// GetScheduledProducts lists every product scheduled for refresh under this API key,
+// oldest first. Data holds one ScheduledProduct per saved product.
 func (c *Client) GetScheduledProducts() (*APIResponse[[]ScheduledProduct], error) {
 	var response APIResponse[[]ScheduledProduct]
 	_, err := c.client.R().
@@ -320,13 +320,13 @@ func (c *Client) GetScheduledProducts() (*APIResponse[[]ScheduledProduct], error
 // parameter. This used to send a JSON body ({identifier}) to /products/schedule, which the
 // server ignores, so every call failed validation. The API returns no data for this call;
 // check Success and Message.
-func (c *Client) RemoveProductFromSchedule(identifier string) (*APIResponse[json.RawMessage], error) {
+func (c *Client) RemoveProductFromSchedule(identifier string) (*UnscheduleResponse, error) {
 	return c.RemoveProductsFromSchedule([]string{identifier})
 }
 
 // RemoveProductsFromSchedule stops scheduled refreshes for several products in one request.
-func (c *Client) RemoveProductsFromSchedule(identifiers []string) (*APIResponse[json.RawMessage], error) {
-	var response APIResponse[json.RawMessage]
+func (c *Client) RemoveProductsFromSchedule(identifiers []string) (*UnscheduleResponse, error) {
+	var response UnscheduleResponse
 	_, err := c.client.R().
 		SetQueryParam("ids", strings.Join(identifiers, ",")).
 		SetResult(&response).

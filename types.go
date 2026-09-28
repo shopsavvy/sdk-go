@@ -2,6 +2,8 @@ package shopsavvy
 
 // APIMeta contains credit usage info from the API response
 type APIMeta struct {
+	// RequestID identifies the request in ShopSavvy's logs; quote it when contacting support.
+	RequestID          *string `json:"request_id,omitempty"`
 	CreditsUsed        int  `json:"credits_used"`
 	CreditsRemaining   int  `json:"credits_remaining"`
 	RateLimitRemaining *int `json:"rate_limit_remaining,omitempty"`
@@ -156,14 +158,20 @@ type ProductWithOfferHistory struct {
 	Offers []OfferWithHistory `json:"offers"`
 }
 
-// ScheduledProduct represents a product that is scheduled for monitoring
+// ScheduledProduct is one element of the Data returned by GetScheduledProducts
+// (GET /products/scheduled): the product's fields (same as GetProductDetails) plus its
+// refresh schedule and, when the schedule is limited to one retailer, that retailer.
+//
+// Schedule is "hourly", "daily" or "weekly", and nil when the product is saved with a
+// refresh interval that has no Data API label (e.g. a 4h/12h interval set through
+// ShopSavvy Business). Retailer is nil when refreshes cover every retailer.
+//
+// This used to declare product_id / identifier / frequency / created_at / last_refreshed —
+// keys the API has never sent — so every field but Retailer decoded empty.
 type ScheduledProduct struct {
-	ProductID     string  `json:"product_id"`
-	Identifier    string  `json:"identifier"`
-	Frequency     string  `json:"frequency"`
-	Retailer      *string `json:"retailer,omitempty"`
-	CreatedAt     string  `json:"created_at"`
-	LastRefreshed *string `json:"last_refreshed,omitempty"`
+	ProductDetails
+	Schedule *string `json:"schedule,omitempty"`
+	Retailer *string `json:"retailer,omitempty"`
 }
 
 // UsagePeriod represents the current billing period details
@@ -359,6 +367,15 @@ type ScheduledProductResult struct {
 	ProductDetails
 	Schedule string  `json:"schedule"`
 	Retailer *string `json:"retailer,omitempty"`
+}
+
+// UnscheduleResponse is returned by RemoveProductFromSchedule and
+// RemoveProductsFromSchedule. DELETE /products/scheduled sends only success, message and
+// meta — no data. Unscheduling costs no credits, so Meta reports zeros.
+type UnscheduleResponse struct {
+	Success bool     `json:"success"`
+	Message string   `json:"message,omitempty"`
+	Meta    *APIMeta `json:"meta,omitempty"`
 }
 
 // ScheduleResponse is no longer returned by any method.
