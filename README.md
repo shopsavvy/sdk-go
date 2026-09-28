@@ -139,91 +139,74 @@ for i, product := range products.Data {
 ### Real-Time Pricing
 
 #### All Retailers Analysis
+
+`GetCurrentOffers` returns one entry per product found; each carries its `Offers`. Offer
+fields the API may omit (`Price`, `Retailer`, `Availability`, `Condition`, …) are pointers.
+`Availability` is one of `"in"`, `"out"`, `"limited"`, `"pre-order"`, `"coming-soon"` or
+`"discontinued"`, and nil when unknown.
+
 ```go
-offers, err := client.GetCurrentOffers("012345678901", "")
+resp, err := client.GetCurrentOffers("012345678901", "")
 if err != nil {
     log.Fatal(err)
 }
 
-fmt.Printf("Found %d offers across retailers\n", len(offers.Data))
-
-// Advanced price analysis
-sort.Slice(offers.Data, func(i, j int) bool {
-    return offers.Data[i].Price < offers.Data[j].Price
-})
-
-cheapest := offers.Data[0]
-mostExpensive := offers.Data[len(offers.Data)-1]
-
-var total float64
-for _, offer := range offers.Data {
-    total += offer.Price
-}
-average := total / float64(len(offers.Data))
-
-fmt.Printf("💰 Best price: %s - $%.2f\n", cheapest.Retailer, cheapest.Price)
-fmt.Printf("💸 Highest price: %s - $%.2f\n", mostExpensive.Retailer, mostExpensive.Price)
-fmt.Printf("📊 Average price: $%.2f\n", average)
-fmt.Printf("💡 Potential savings: $%.2f\n", mostExpensive.Price-cheapest.Price)
-
-// Filter by availability and condition
-inStockCount := 0
-newConditionCount := 0
-for _, offer := range offers.Data {
-    if offer.Availability == "in_stock" {
-        inStockCount++
+for _, product := range resp.Data {
+    // Keep only offers that have a price, cheapest first
+    var priced []shopsavvy.Offer
+    for _, offer := range product.Offers {
+        if offer.Price != nil {
+            priced = append(priced, offer)
+        }
     }
-    if offer.Condition == "new" {
-        newConditionCount++
+    if len(priced) == 0 {
+        continue
     }
-}
+    sort.Slice(priced, func(i, j int) bool { return *priced[i].Price < *priced[j].Price })
 
-fmt.Printf("✅ In-stock offers: %d\n", inStockCount)
-fmt.Printf("🆕 New condition: %d\n", newConditionCount)
+    name := func(o shopsavvy.Offer) string {
+        if o.Retailer != nil {
+            return *o.Retailer
+        }
+        return "unknown retailer"
+    }
+    cheapest, priciest := priced[0], priced[len(priced)-1]
+    fmt.Printf("%s: %d offers\n", product.Title, len(product.Offers))
+    fmt.Printf("💰 Best price: %s - $%.2f\n", name(cheapest), *cheapest.Price)
+    fmt.Printf("💸 Highest price: %s - $%.2f\n", name(priciest), *priciest.Price)
+
+    // Filter by availability and condition
+    inStock, newCondition := 0, 0
+    for _, offer := range product.Offers {
+        if offer.Availability != nil && *offer.Availability == "in" {
+            inStock++
+        }
+        if offer.Condition != nil && *offer.Condition == "new" {
+            newCondition++
+        }
+    }
+    fmt.Printf("✅ In-stock offers: %d\n", inStock)
+    fmt.Printf("🆕 New condition: %d\n", newCondition)
+}
 ```
 
 #### Retailer-Specific Queries
 ```go
-// Major retailers
-retailers := []string{"amazon", "walmart", "target", "bestbuy"}
-retailerPrices := make(map[string]float64)
+// Pass a retailer domain to get only that retailer's offers
+retailers := []string{"amazon.com", "walmart.com", "target.com", "bestbuy.com"}
 
 for _, retailer := range retailers {
-    offers, err := client.GetCurrentOffers("012345678901", retailer)
+    resp, err := client.GetCurrentOffers("012345678901", retailer)
     if err != nil {
         continue // Skip on error
     }
-    
-    if len(offers.Data) > 0 {
-        // Find best offer for this retailer
-        bestPrice := offers.Data[0].Price
-        for _, offer := range offers.Data {
-            if offer.Price < bestPrice {
-                bestPrice = offer.Price
+    for _, product := range resp.Data {
+        for _, offer := range product.Offers {
+            if offer.Price != nil {
+                fmt.Printf("  %s: $%.2f\n", retailer, *offer.Price)
             }
         }
-        retailerPrices[retailer] = bestPrice
     }
-}
-
-// Sort and display results
-type retailerPrice struct {
-    name  string
-    price float64
-}
-
-var sorted []retailerPrice
-for name, price := range retailerPrices {
-    sorted = append(sorted, retailerPrice{name, price})
-}
-
-sort.Slice(sorted, func(i, j int) bool {
-    return sorted[i].price < sorted[j].price
-})
-
-fmt.Println("Retailer price comparison:")
-for _, rp := range sorted {
-    fmt.Printf("  %s: $%.2f\n", strings.Title(rp.name), rp.price)
 }
 ```
 
@@ -258,6 +241,52 @@ for _, product := range history.Data {
 
 // Only one retailer's history:
 amazonHistory, err := client.GetPriceHistory("012345678901", "2024-01-01", "2024-01-31", "amazon.com")
+```
+
+### Scheduled Refresh
+
+Schedule products to be refreshed `"hourly"`, `"daily"` or `"weekly"`, optionally limited to
+one retailer domain. Scheduling costs 1 credit per product found; listing and unscheduling
+are free.
+
+```go
+// Schedule one product (or several with ScheduleProductMonitoringBatch)
+scheduled, err := client.ScheduleProductMonitoringBatch(
+    []string{"012345678901", "B07GV2S1GS"}, "daily", "amazon.com")
+if err != nil {
+    log.Fatal(err)
+}
+// Data holds one ScheduledProductResult per product found: every product field
+// (Title, ShopSavvy, Barcode, …) plus the Schedule that was set and the Retailer, if any.
+for _, p := range scheduled.Data {
+    fmt.Printf("%s (%s) → %s\n", p.Title, p.ShopSavvy, p.Schedule)
+}
+fmt.Printf("Credits used: %d\n", scheduled.CreditsUsed())
+
+// List everything scheduled under this API key
+list, err := client.GetScheduledProducts()
+if err != nil {
+    log.Fatal(err)
+}
+for _, p := range list.Data {
+    // Schedule is nil for an interval with no Data API label (e.g. set via ShopSavvy
+    // Business); Retailer is nil when refreshes cover every retailer.
+    schedule, retailer := "custom", "all retailers"
+    if p.Schedule != nil {
+        schedule = *p.Schedule
+    }
+    if p.Retailer != nil {
+        retailer = *p.Retailer
+    }
+    fmt.Printf("%s: %s, %s\n", p.Title, schedule, retailer)
+}
+
+// Stop refreshing (RemoveProductsFromSchedule for several). The API returns no data here.
+removed, err := client.RemoveProductFromSchedule("012345678901")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(removed.Success, removed.Message) // true Products successfully removed from schedule
 ```
 
 ## 🚀 Production Deployment
