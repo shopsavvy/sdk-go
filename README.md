@@ -227,6 +227,39 @@ for _, rp := range sorted {
 }
 ```
 
+### Price History
+
+`GetPriceHistory` takes one or more identifiers (comma-separated), a `start` and `end`
+date (`YYYY-MM-DD`, at most 366 days apart), and an optional retailer domain. `Data` holds
+one entry per product found; each product carries its `Offers`, and each offer carries its
+`History` points, newest first.
+
+```go
+history, err := client.GetPriceHistory("012345678901", "2024-01-01", "2024-01-31", "")
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, product := range history.Data {
+    fmt.Println(product.Title)
+    for _, offer := range product.Offers {
+        retailer := "unknown retailer"
+        if offer.Retailer != nil {
+            retailer = *offer.Retailer
+        }
+        fmt.Printf("  %s: %d price points\n", retailer, len(offer.History))
+        for _, point := range offer.History {
+            // Currency is "" on an archived point with no recorded currency;
+            // Availability is "" when it was not known at that time.
+            fmt.Printf("    %s  %.2f %s  %s\n", point.Timestamp, point.Price, point.Currency, point.Availability)
+        }
+    }
+}
+
+// Only one retailer's history:
+amazonHistory, err := client.GetPriceHistory("012345678901", "2024-01-01", "2024-01-31", "amazon.com")
+```
+
 ## 🚀 Production Deployment
 
 ### HTTP Server Integration
