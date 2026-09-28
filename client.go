@@ -20,6 +20,7 @@
 package shopsavvy
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -264,44 +265,33 @@ func (c *Client) GetPriceHistory(identifier, startDate, endDate string, retailer
 	return &response, nil
 }
 
-// ScheduleProductMonitoring schedules product monitoring
-func (c *Client) ScheduleProductMonitoring(identifier, frequency string, retailer ...string) (*APIResponse[ScheduleResponse], error) {
-	body := map[string]interface{}{
-		"identifier": identifier,
-		"frequency":  frequency,
-	}
-	if len(retailer) > 0 && retailer[0] != "" {
-		body["retailer"] = retailer[0]
-	}
-
-	var response APIResponse[ScheduleResponse]
-	_, err := c.client.R().
-		SetBody(body).
-		SetResult(&response).
-		Post("/products/schedule")
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &response, nil
+// ScheduleProductMonitoring schedules a product for regular price refreshes.
+// frequency is "hourly", "daily" or "weekly"; retailer optionally limits refreshes to one
+// retailer domain (e.g. "amazon.com").
+//
+// The server reads only query parameters here: PUT /products/scheduled?ids=…&schedule=…
+// [&retailer=…]. This used to POST a JSON body ({identifier, frequency}) to
+// /products/schedule, which the handler never reads, so every call failed validation.
+func (c *Client) ScheduleProductMonitoring(identifier, frequency string, retailer ...string) (*APIResponse[[]ScheduledProductResult], error) {
+	return c.ScheduleProductMonitoringBatch([]string{identifier}, frequency, retailer...)
 }
 
-// ScheduleProductMonitoringBatch schedules monitoring for multiple products
-func (c *Client) ScheduleProductMonitoringBatch(identifiers []string, frequency string, retailer ...string) (*APIResponse[[]ScheduleBatchResponse], error) {
-	body := map[string]interface{}{
-		"identifiers": strings.Join(identifiers, ","),
-		"frequency":   frequency,
+// ScheduleProductMonitoringBatch schedules several products in one request. Data holds
+// one entry per product the API found and scheduled.
+func (c *Client) ScheduleProductMonitoringBatch(identifiers []string, frequency string, retailer ...string) (*APIResponse[[]ScheduledProductResult], error) {
+	params := map[string]string{
+		"ids":      strings.Join(identifiers, ","),
+		"schedule": frequency,
 	}
 	if len(retailer) > 0 && retailer[0] != "" {
-		body["retailer"] = retailer[0]
+		params["retailer"] = retailer[0]
 	}
 
-	var response APIResponse[[]ScheduleBatchResponse]
+	var response APIResponse[[]ScheduledProductResult]
 	_, err := c.client.R().
-		SetBody(body).
+		SetQueryParams(params).
 		SetResult(&response).
-		Post("/products/schedule")
+		Put("/products/scheduled")
 
 	if err != nil {
 		return nil, err
@@ -324,36 +314,23 @@ func (c *Client) GetScheduledProducts() (*APIResponse[[]ScheduledProduct], error
 	return &response, nil
 }
 
-// RemoveProductFromSchedule removes a product from monitoring schedule
-func (c *Client) RemoveProductFromSchedule(identifier string) (*APIResponse[RemoveResponse], error) {
-	body := map[string]interface{}{
-		"identifier": identifier,
-	}
-
-	var response APIResponse[RemoveResponse]
-	_, err := c.client.R().
-		SetBody(body).
-		SetResult(&response).
-		Delete("/products/schedule")
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &response, nil
+// RemoveProductFromSchedule stops scheduled refreshes for a product.
+//
+// Sends DELETE /products/scheduled?ids=… — the handler reads only the `ids` query
+// parameter. This used to send a JSON body ({identifier}) to /products/schedule, which the
+// server ignores, so every call failed validation. The API returns no data for this call;
+// check Success and Message.
+func (c *Client) RemoveProductFromSchedule(identifier string) (*APIResponse[json.RawMessage], error) {
+	return c.RemoveProductsFromSchedule([]string{identifier})
 }
 
-// RemoveProductsFromSchedule removes multiple products from monitoring schedule
-func (c *Client) RemoveProductsFromSchedule(identifiers []string) (*APIResponse[[]RemoveBatchResponse], error) {
-	body := map[string]interface{}{
-		"identifiers": strings.Join(identifiers, ","),
-	}
-
-	var response APIResponse[[]RemoveBatchResponse]
+// RemoveProductsFromSchedule stops scheduled refreshes for several products in one request.
+func (c *Client) RemoveProductsFromSchedule(identifiers []string) (*APIResponse[json.RawMessage], error) {
+	var response APIResponse[json.RawMessage]
 	_, err := c.client.R().
-		SetBody(body).
+		SetQueryParam("ids", strings.Join(identifiers, ",")).
 		SetResult(&response).
-		Delete("/products/schedule")
+		Delete("/products/scheduled")
 
 	if err != nil {
 		return nil, err

@@ -1,9 +1,12 @@
 package shopsavvy
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -190,5 +193,146 @@ func TestGetPriceHistoryParsesProductsOffersAndHistory(t *testing.T) {
 	}
 	if ebay.History == nil || len(ebay.History) != 0 {
 		t.Errorf("ebay history = %#v, want empty non-nil slice", ebay.History)
+	}
+}
+
+type recordedRequest struct {
+	method string
+	path   string
+	query  string
+	body   string
+}
+
+// newRecordingServer answers every request with body and records what the client sent.
+func newRecordingServer(t *testing.T, body string, got *recordedRequest) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		*got = recordedRequest{method: r.Method, path: r.URL.Path, query: r.URL.RawQuery, body: string(b)}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// scheduleResponseBody is the shape the schedule handler returns: one entry per product,
+// the product's public fields plus `schedule` (and `retailer` when one was requested).
+const scheduleResponseBody = `{"success":true,"data":[
+ {"title":"Keurig K-Mini","shopsavvy":"3ONn300xybP3y66ibqc1","barcode":"611247373064","amazon":null,"images":[],"schedule":"daily","retailer":"amazon.com"},
+ {"title":"Keurig K-Elite","shopsavvy":"DrKWneG0MpFlZpwZXNYa","barcode":"611247369449","images":[],"schedule":"daily","retailer":"amazon.com"}],
+ "meta":{"request_id":"r1","credits_used":2,"credits_remaining":998,"rate_limit_remaining":999}}`
+
+const unscheduleResponseBody = `{"success":true,"message":"Products successfully removed from schedule","meta":{"request_id":"r2","credits_used":0,"credits_remaining":0,"rate_limit_remaining":0}}`
+
+func assertRequest(t *testing.T, got recordedRequest, method, path string, query url.Values) {
+	t.Helper()
+	if got.method != method || got.path != path {
+		t.Errorf("request = %s %s, want %s %s", got.method, got.path, method, path)
+	}
+	gotQuery, err := url.ParseQuery(got.query)
+	if err != nil {
+		t.Fatalf("parse query %q: %v", got.query, err)
+	}
+	if gotQuery.Encode() != query.Encode() {
+		t.Errorf("query = %q, want %q", gotQuery.Encode(), query.Encode())
+	}
+	if got.body != "" {
+		t.Errorf("request body = %q, want none (the server reads only query params)", got.body)
+	}
+}
+
+func TestScheduleProductMonitoringSendsQueryParams(t *testing.T) {
+	var got recordedRequest
+	srv := newRecordingServer(t, scheduleResponseBody, &got)
+	c := newTestClient(t, srv.URL)
+
+	resp, err := c.ScheduleProductMonitoring("611247373064", "daily")
+	if err != nil {
+		t.Fatalf("ScheduleProductMonitoring: %v", err)
+	}
+	assertRequest(t, got, http.MethodPut, "/products/scheduled", url.Values{"ids": {"611247373064"}, "schedule": {"daily"}})
+	if !strings.Contains(got.query, "ids=611247373064") {
+		t.Errorf("raw query %q", got.query)
+	}
+
+	if len(resp.Data) != 2 || resp.Data[0].ShopSavvy != "3ONn300xybP3y66ibqc1" || resp.Data[0].Schedule != "daily" {
+		t.Fatalf("parsed data = %+v", resp.Data)
+	}
+	if strOrNil(resp.Data[0].Retailer) != "amazon.com" || resp.Data[0].Amazon != nil || strOrNil(resp.Data[1].Barcode) != "611247369449" {
+		t.Errorf("parsed product fields wrong: %+v", resp.Data)
+	}
+	if resp.CreditsUsed() != 2 {
+		t.Errorf("CreditsUsed = %d, want 2", resp.CreditsUsed())
+	}
+}
+
+func TestScheduleProductMonitoringWithRetailer(t *testing.T) {
+	var got recordedRequest
+	srv := newRecordingServer(t, scheduleResponseBody, &got)
+	c := newTestClient(t, srv.URL)
+
+	if _, err := c.ScheduleProductMonitoring("611247373064", "hourly", "amazon.com"); err != nil {
+		t.Fatalf("ScheduleProductMonitoring: %v", err)
+	}
+	assertRequest(t, got, http.MethodPut, "/products/scheduled", url.Values{"ids": {"611247373064"}, "schedule": {"hourly"}, "retailer": {"amazon.com"}})
+}
+
+func TestScheduleProductMonitoringBatchSendsQueryParams(t *testing.T) {
+	var got recordedRequest
+	srv := newRecordingServer(t, scheduleResponseBody, &got)
+	c := newTestClient(t, srv.URL)
+
+	resp, err := c.ScheduleProductMonitoringBatch([]string{"611247373064", "611247369449"}, "weekly")
+	if err != nil {
+		t.Fatalf("ScheduleProductMonitoringBatch: %v", err)
+	}
+	assertRequest(t, got, http.MethodPut, "/products/scheduled", url.Values{"ids": {"611247373064,611247369449"}, "schedule": {"weekly"}})
+	if !strings.Contains(got.query, "ids=611247373064%2C611247369449") {
+		t.Errorf("ids not comma-joined and URL-encoded in raw query %q", got.query)
+	}
+	if len(resp.Data) != 2 || resp.Data[1].Title != "Keurig K-Elite" {
+		t.Errorf("parsed data = %+v", resp.Data)
+	}
+}
+
+func TestScheduleProductMonitoringBatchWithRetailer(t *testing.T) {
+	var got recordedRequest
+	srv := newRecordingServer(t, scheduleResponseBody, &got)
+	c := newTestClient(t, srv.URL)
+
+	if _, err := c.ScheduleProductMonitoringBatch([]string{"611247373064", "B07G14HTBZ"}, "daily", "bestbuy.com"); err != nil {
+		t.Fatalf("ScheduleProductMonitoringBatch: %v", err)
+	}
+	assertRequest(t, got, http.MethodPut, "/products/scheduled", url.Values{"ids": {"611247373064,B07G14HTBZ"}, "schedule": {"daily"}, "retailer": {"bestbuy.com"}})
+}
+
+func TestRemoveProductFromScheduleSendsQueryParams(t *testing.T) {
+	var got recordedRequest
+	srv := newRecordingServer(t, unscheduleResponseBody, &got)
+	c := newTestClient(t, srv.URL)
+
+	resp, err := c.RemoveProductFromSchedule("611247373064")
+	if err != nil {
+		t.Fatalf("RemoveProductFromSchedule: %v", err)
+	}
+	assertRequest(t, got, http.MethodDelete, "/products/scheduled", url.Values{"ids": {"611247373064"}})
+	if !resp.Success || resp.Message != "Products successfully removed from schedule" {
+		t.Errorf("parsed response = %+v", resp)
+	}
+}
+
+func TestRemoveProductsFromScheduleSendsQueryParams(t *testing.T) {
+	var got recordedRequest
+	srv := newRecordingServer(t, unscheduleResponseBody, &got)
+	c := newTestClient(t, srv.URL)
+
+	resp, err := c.RemoveProductsFromSchedule([]string{"611247373064", "611247369449"})
+	if err != nil {
+		t.Fatalf("RemoveProductsFromSchedule: %v", err)
+	}
+	assertRequest(t, got, http.MethodDelete, "/products/scheduled", url.Values{"ids": {"611247373064,611247369449"}})
+	if !resp.Success {
+		t.Errorf("Success = false")
 	}
 }

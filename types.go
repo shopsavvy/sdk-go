@@ -352,25 +352,44 @@ func (r *ProductSearchResult) CreditsRemaining() int {
 	return 0
 }
 
-// ScheduleResponse represents the response from scheduling a product
+// ScheduledProductResult is one element of the Data returned by ScheduleProductMonitoring
+// and ScheduleProductMonitoringBatch: the scheduled product's fields (same as
+// GetProductDetails) plus the schedule that was set and, when requested, the retailer.
+type ScheduledProductResult struct {
+	ProductDetails
+	Schedule string  `json:"schedule"`
+	Retailer *string `json:"retailer,omitempty"`
+}
+
+// ScheduleResponse is no longer returned by any method.
+//
+// Deprecated: the API has never sent this shape — scheduling returns a list of products
+// (see ScheduledProductResult). Decoding that list into this struct failed on every call.
 type ScheduleResponse struct {
 	Scheduled bool   `json:"scheduled"`
 	ProductID string `json:"product_id"`
 }
 
-// ScheduleBatchResponse represents the response from batch scheduling
+// ScheduleBatchResponse is no longer returned by any method.
+//
+// Deprecated: use ScheduledProductResult.
 type ScheduleBatchResponse struct {
 	Identifier string `json:"identifier"`
 	Scheduled  bool   `json:"scheduled"`
 	ProductID  string `json:"product_id"`
 }
 
-// RemoveResponse represents the response from removing a product from schedule
+// RemoveResponse is no longer returned by any method.
+//
+// Deprecated: the API sends no data when unscheduling (only success and message), so
+// Removed always decoded to false.
 type RemoveResponse struct {
 	Removed bool `json:"removed"`
 }
 
-// RemoveBatchResponse represents the response from batch removal
+// RemoveBatchResponse is no longer returned by any method.
+//
+// Deprecated: the API sends no data when unscheduling.
 type RemoveBatchResponse struct {
 	Identifier string `json:"identifier"`
 	Removed    bool   `json:"removed"`
