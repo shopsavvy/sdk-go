@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-shopsavvy.com-blue)](https://shopsavvy.com/data/documentation)
 
-Official Go SDK for the [ShopSavvy Data API](https://shopsavvy.com/data). Access comprehensive product data, real-time pricing, and historical price trends across **thousands of retailers** and **millions of products**.
+Official Go SDK for the [ShopSavvy Data API](https://shopsavvy.com/data). Access comprehensive product data, real-time pricing, and historical price trends across **tens of thousands of retailers** and **tens of millions of products**.
 
 ## ⚡ 30-Second Quick Start
 
@@ -115,7 +115,7 @@ func stringValue(s *string) string {
 
 #### Bulk Product Lookup
 ```go
-// Process up to 100 products at once (Pro plan)
+// Up to 100 identifiers per request
 identifiers := []string{
     "012345678901", "B08N5WRWNW", "045496590048",
     "https://www.bestbuy.com/site/product/123456",
@@ -246,8 +246,8 @@ amazonHistory, err := client.GetPriceHistory("012345678901", "2024-01-01", "2024
 ### Scheduled Refresh
 
 Schedule products to be refreshed `"hourly"`, `"daily"` or `"weekly"`, optionally limited to
-one retailer domain. Scheduling costs 1 credit per product found; listing and unscheduling
-are free.
+one retailer domain. Credit costs for each call are in the
+[API documentation](https://shopsavvy.com/data/documentation).
 
 ```go
 // Schedule one product (or several with ScheduleProductMonitoringBatch)
@@ -533,7 +533,7 @@ ShopSavvy has been comparing prices since 2008, and the app has 40M+ downloads. 
 - **JSON or CSV** responses, with credits used and remaining on every response
 - **Open-source SDKs in 10 languages**: Python, TypeScript, Go, Rust, Java, Kotlin, Swift, PHP, Ruby and C#
 
-Plans and the 14-day Starter trial are at [shopsavvy.com/data](https://shopsavvy.com/data); full reference at [shopsavvy.com/data/documentation](https://shopsavvy.com/data/documentation).
+Plans and the 14-day trial are at [shopsavvy.com/data](https://shopsavvy.com/data); full reference at [shopsavvy.com/data/documentation](https://shopsavvy.com/data/documentation).
 
 ---
 
