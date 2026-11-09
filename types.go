@@ -4,16 +4,16 @@ package shopsavvy
 type APIMeta struct {
 	// RequestID identifies the request in ShopSavvy's logs; quote it when contacting support.
 	RequestID          *string `json:"request_id,omitempty"`
-	CreditsUsed        int  `json:"credits_used"`
-	CreditsRemaining   int  `json:"credits_remaining"`
-	RateLimitRemaining *int `json:"rate_limit_remaining,omitempty"`
+	CreditsUsed        int     `json:"credits_used"`
+	CreditsRemaining   int     `json:"credits_remaining"`
+	RateLimitRemaining *int    `json:"rate_limit_remaining,omitempty"`
 }
 
 // APIResponse represents a response from the ShopSavvy API
 type APIResponse[T any] struct {
-	Success bool    `json:"success"`
-	Data    T       `json:"data"`
-	Message string  `json:"message,omitempty"`
+	Success bool     `json:"success"`
+	Data    T        `json:"data"`
+	Message string   `json:"message,omitempty"`
 	Meta    *APIMeta `json:"meta,omitempty"`
 }
 
@@ -35,25 +35,25 @@ func (r *APIResponse[T]) CreditsRemaining() int {
 
 // ProductDetails represents detailed product information
 type ProductDetails struct {
-	Title     string   `json:"title"`
-	ShopSavvy string   `json:"shopsavvy"`
-	Brand     *string  `json:"brand,omitempty"`
-	Category  *string  `json:"category,omitempty"`
-	Images    []string `json:"images,omitempty"`
-	Barcode   *string  `json:"barcode,omitempty"`
-	Amazon    *string  `json:"amazon,omitempty"`
-	Model     *string  `json:"model,omitempty"`
-	MPN       *string  `json:"mpn,omitempty"`
-	Color       *string            `json:"color,omitempty"`
-	TitleShort  *string            `json:"title_short,omitempty"`
-	Slug        *string            `json:"slug,omitempty"`
-	Description *string            `json:"description,omitempty"`
-	Categories  []string           `json:"categories,omitempty"`
-	Attributes  map[string]string  `json:"attributes,omitempty"`
-	Rating      *ProductRating     `json:"rating,omitempty"`
-	Score       *ProductScore      `json:"score,omitempty"`
-	Keywords    []string           `json:"keywords,omitempty"`
-	Identifiers map[string]any     `json:"identifiers,omitempty"`
+	Title       string            `json:"title"`
+	ShopSavvy   string            `json:"shopsavvy"`
+	Brand       *string           `json:"brand,omitempty"`
+	Category    *string           `json:"category,omitempty"`
+	Images      []string          `json:"images,omitempty"`
+	Barcode     *string           `json:"barcode,omitempty"`
+	Amazon      *string           `json:"amazon,omitempty"`
+	Model       *string           `json:"model,omitempty"`
+	MPN         *string           `json:"mpn,omitempty"`
+	Color       *string           `json:"color,omitempty"`
+	TitleShort  *string           `json:"title_short,omitempty"`
+	Slug        *string           `json:"slug,omitempty"`
+	Description *string           `json:"description,omitempty"`
+	Categories  []string          `json:"categories,omitempty"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
+	Rating      *ProductRating    `json:"rating,omitempty"`
+	Score       *ProductScore     `json:"score,omitempty"`
+	Keywords    []string          `json:"keywords,omitempty"`
+	Identifiers map[string]any    `json:"identifiers,omitempty"`
 }
 
 // Name returns the product title (deprecated alias)
@@ -112,6 +112,31 @@ func (o *Offer) LastUpdated() *string {
 type ProductWithOffers struct {
 	ProductDetails
 	Offers []Offer `json:"offers"`
+	// InStorePrices are user-collected shelf prices read from shoppers' scanned receipts.
+	// Empty (nil) when none are on file, and on price history responses.
+	InStorePrices []InStorePrice `json:"in_store_prices"`
+}
+
+// InStorePrice is a shelf price a physical store charged on a given day, read from a
+// shopper's scanned receipt. Source is always "user-collected". It says what the store sold
+// the product for that day, not that it is in stock now; nothing about the shopper is included.
+type InStorePrice struct {
+	Source   string          `json:"source"`
+	Retailer *string         `json:"retailer"`
+	Store    InStoreLocation `json:"store"`
+	// Price is the unit shelf price paid (the median when several receipts agree).
+	Price    float64 `json:"price"`
+	Currency string  `json:"currency"`
+	// ObservedOn is the YYYY-MM-DD date of the most recent receipt behind the price.
+	ObservedOn *string `json:"observed_on"`
+	Timestamp  *string `json:"timestamp"`
+}
+
+// InStoreLocation is the store an InStorePrice was charged at.
+type InStoreLocation struct {
+	Address   *string  `json:"address"`
+	Latitude  *float64 `json:"latitude"`
+	Longitude *float64 `json:"longitude"`
 }
 
 // PriceHistoryEntry represents a single price point in history.
@@ -244,29 +269,29 @@ type ProductScore struct {
 
 // Deal represents a shopping deal with expert grading
 type Deal struct {
-	Path         string          `json:"path"`
-	Title        string          `json:"title"`
-	Subtitle     *string         `json:"subtitle,omitempty"`
-	Description  *string         `json:"description,omitempty"`
-	Emoji        *string         `json:"emoji,omitempty"`
-	Grade        DealGrade       `json:"grade"`
-	Pricing      DealPricing     `json:"pricing"`
-	Retailer     DealRetailer    `json:"retailer"`
-	Product      *string         `json:"product,omitempty"`
-	URL          string          `json:"url"`
-	Image        map[string]any  `json:"image,omitempty"`
-	Votes        DealVotes       `json:"votes"`
-	CommentCount int             `json:"comment_count"`
-	Tags         []DealTag       `json:"tags,omitempty"`
-	ExpiresAt    *string         `json:"expires_at,omitempty"`
-	CreatedAt    string          `json:"created_at"`
+	Path         string         `json:"path"`
+	Title        string         `json:"title"`
+	Subtitle     *string        `json:"subtitle,omitempty"`
+	Description  *string        `json:"description,omitempty"`
+	Emoji        *string        `json:"emoji,omitempty"`
+	Grade        DealGrade      `json:"grade"`
+	Pricing      DealPricing    `json:"pricing"`
+	Retailer     DealRetailer   `json:"retailer"`
+	Product      *string        `json:"product,omitempty"`
+	URL          string         `json:"url"`
+	Image        map[string]any `json:"image,omitempty"`
+	Votes        DealVotes      `json:"votes"`
+	CommentCount int            `json:"comment_count"`
+	Tags         []DealTag      `json:"tags,omitempty"`
+	ExpiresAt    *string        `json:"expires_at,omitempty"`
+	CreatedAt    string         `json:"created_at"`
 }
 
 type DealGrade struct {
-	Letter        string   `json:"letter"`
-	Suffix        *string  `json:"suffix,omitempty"`
-	Value         float64  `json:"value"`
-	Justification *string  `json:"justification,omitempty"`
+	Letter        string  `json:"letter"`
+	Suffix        *string `json:"suffix,omitempty"`
+	Value         float64 `json:"value"`
+	Justification *string `json:"justification,omitempty"`
 }
 
 type DealPricing struct {
@@ -292,10 +317,10 @@ type DealTag struct {
 
 // DealsResponse represents the response from the deals endpoint
 type DealsResponse struct {
-	Success    bool          `json:"success"`
-	Deals      []Deal        `json:"deals"`
+	Success    bool            `json:"success"`
+	Deals      []Deal          `json:"deals"`
 	Pagination DealsPagination `json:"pagination"`
-	Meta       *APIMeta      `json:"meta,omitempty"`
+	Meta       *APIMeta        `json:"meta,omitempty"`
 }
 
 type DealsPagination struct {
@@ -330,10 +355,10 @@ type TLDRReview struct {
 
 // ReviewResponse represents the response from the reviews endpoint
 type ReviewResponse struct {
-	Success bool               `json:"success"`
-	Product map[string]string  `json:"product"`
-	Review  *TLDRReview        `json:"review"`
-	Meta    *APIMeta           `json:"meta,omitempty"`
+	Success bool              `json:"success"`
+	Product map[string]string `json:"product"`
+	Review  *TLDRReview       `json:"review"`
+	Meta    *APIMeta          `json:"meta,omitempty"`
 }
 
 // ProductSearchResult represents the response from a product search

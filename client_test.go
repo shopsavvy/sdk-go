@@ -336,3 +336,34 @@ func TestRemoveProductsFromScheduleSendsQueryParams(t *testing.T) {
 		t.Errorf("Success = false")
 	}
 }
+
+func TestGetCurrentOffersParsesInStorePrices(t *testing.T) {
+	var q map[string]string
+	srv := newFixtureServer(t, "/products/offers", "offers-in-store-fixture.json", &q)
+	c := newTestClient(t, srv.URL)
+
+	resp, err := c.GetCurrentOffers("011110838360", "")
+	if err != nil {
+		t.Fatalf("GetCurrentOffers: %v", err)
+	}
+	if q["ids"] != "011110838360" {
+		t.Errorf("ids = %q", q["ids"])
+	}
+	product := resp.Data[0]
+	if len(product.Offers) != 1 || len(product.InStorePrices) != 1 {
+		t.Fatalf("offers/in-store = %d/%d, want 1/1", len(product.Offers), len(product.InStorePrices))
+	}
+	inStore := product.InStorePrices[0]
+	if inStore.Source != "user-collected" || inStore.Retailer == nil || *inStore.Retailer != "Kroger" {
+		t.Errorf("source/retailer = %q/%v", inStore.Source, inStore.Retailer)
+	}
+	if inStore.Store.Address == nil || *inStore.Store.Address != "1014 Vine St, Cincinnati, OH 45202, USA" {
+		t.Errorf("address = %v", inStore.Store.Address)
+	}
+	if inStore.Store.Latitude == nil || *inStore.Store.Latitude != 39.1086 {
+		t.Errorf("latitude = %v", inStore.Store.Latitude)
+	}
+	if inStore.Price != 3.49 || inStore.Currency != "USD" || inStore.ObservedOn == nil || *inStore.ObservedOn != "2026-11-07" {
+		t.Errorf("price/currency/observed_on = %v/%q/%v", inStore.Price, inStore.Currency, inStore.ObservedOn)
+	}
+}

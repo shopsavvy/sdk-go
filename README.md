@@ -7,6 +7,20 @@
 
 Official Go SDK for the [ShopSavvy Data API](https://shopsavvy.com/data). Access comprehensive product data, real-time pricing, and historical price trends across **tens of thousands of retailers** and **30M+ products**.
 
+### In-Store Prices (user-collected)
+
+Each product from the current-offers call also carries `in_store_prices`: shelf prices physical stores charged, read from receipts ShopSavvy app users scanned. Every entry is labeled `source: "user-collected"` and has the retailer, the store's address and coordinates, the price and the receipt date (`observed_on`). It is a price on that day, not current stock, and says nothing about the shopper. Empty when none are on file.
+
+```go
+resp, err := client.GetCurrentOffers("011110838360", "")
+if err != nil {
+	log.Fatal(err)
+}
+for _, inStore := range resp.Data[0].InStorePrices {
+	fmt.Printf("%s: $%.2f on %s\n", *inStore.Retailer, inStore.Price, *inStore.ObservedOn)
+}
+```
+
 ## ⚡ 30-Second Quick Start
 
 ```go
