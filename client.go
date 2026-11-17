@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ import (
 )
 
 // Version is the current SDK version
-const Version = "1.5.0"
+const Version = "1.6.0"
 
 // Client represents the ShopSavvy Data API client
 type Client struct {
@@ -346,15 +347,33 @@ func (c *Client) GetDeals(opts *DealsOptions) (*DealsResponse, error) {
 
 	if opts != nil {
 		params := map[string]string{}
-		if opts.Sort != "" { params["sort"] = opts.Sort }
-		if opts.Limit > 0 { params["limit"] = fmt.Sprintf("%d", opts.Limit) }
-		if opts.Offset > 0 { params["offset"] = fmt.Sprintf("%d", opts.Offset) }
-		if opts.Category != "" { params["category"] = opts.Category }
-		if opts.Retailer != "" { params["retailer"] = opts.Retailer }
-		if opts.Tag != "" { params["tag"] = opts.Tag }
-		if opts.MinPrice > 0 { params["min_price"] = fmt.Sprintf("%.2f", opts.MinPrice) }
-		if opts.MaxPrice > 0 { params["max_price"] = fmt.Sprintf("%.2f", opts.MaxPrice) }
-		if opts.Grade != "" { params["grade"] = opts.Grade }
+		if opts.Sort != "" {
+			params["sort"] = opts.Sort
+		}
+		if opts.Limit > 0 {
+			params["limit"] = fmt.Sprintf("%d", opts.Limit)
+		}
+		if opts.Offset > 0 {
+			params["offset"] = fmt.Sprintf("%d", opts.Offset)
+		}
+		if opts.Category != "" {
+			params["category"] = opts.Category
+		}
+		if opts.Retailer != "" {
+			params["retailer"] = opts.Retailer
+		}
+		if opts.Tag != "" {
+			params["tag"] = opts.Tag
+		}
+		if opts.MinPrice > 0 {
+			params["min_price"] = fmt.Sprintf("%.2f", opts.MinPrice)
+		}
+		if opts.MaxPrice > 0 {
+			params["max_price"] = fmt.Sprintf("%.2f", opts.MaxPrice)
+		}
+		if opts.Grade != "" {
+			params["grade"] = opts.Grade
+		}
 		req.SetQueryParams(params)
 	}
 
@@ -412,7 +431,9 @@ func (c *Client) GetBatchStatus(batchID string) (map[string]interface{}, error) 
 func (c *Client) CreateWebhook(url string, events []string) (map[string]interface{}, error) {
 	var response map[string]interface{}
 	_, err := c.client.R().SetBody(map[string]interface{}{"url": url, "events": events}).SetResult(&response).Post("/webhooks")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -420,7 +441,9 @@ func (c *Client) CreateWebhook(url string, events []string) (map[string]interfac
 func (c *Client) ListWebhooks() (map[string]interface{}, error) {
 	var response map[string]interface{}
 	_, err := c.client.R().SetResult(&response).Get("/webhooks")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -428,7 +451,9 @@ func (c *Client) ListWebhooks() (map[string]interface{}, error) {
 func (c *Client) TestWebhook(webhookID string) (map[string]interface{}, error) {
 	var response map[string]interface{}
 	_, err := c.client.R().SetResult(&response).Post("/webhooks/" + webhookID + "/test")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -446,12 +471,20 @@ func (c *Client) UpdateWebhook(webhookID string, options UpdateWebhookOptions) (
 		return nil, fmt.Errorf("UpdateWebhook requires at least one of URL, Events, or IsActive")
 	}
 	body := map[string]interface{}{}
-	if options.URL != nil { body["url"] = *options.URL }
-	if options.Events != nil { body["events"] = *options.Events }
-	if options.IsActive != nil { body["is_active"] = *options.IsActive }
+	if options.URL != nil {
+		body["url"] = *options.URL
+	}
+	if options.Events != nil {
+		body["events"] = *options.Events
+	}
+	if options.IsActive != nil {
+		body["is_active"] = *options.IsActive
+	}
 	var response map[string]interface{}
 	_, err := c.client.R().SetBody(body).SetResult(&response).Put("/webhooks/" + webhookID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -459,7 +492,9 @@ func (c *Client) UpdateWebhook(webhookID string, options UpdateWebhookOptions) (
 func (c *Client) DeleteWebhook(webhookID string) (map[string]interface{}, error) {
 	var response map[string]interface{}
 	_, err := c.client.R().SetResult(&response).Delete("/webhooks/" + webhookID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -477,42 +512,69 @@ func (c *Client) GetUsage() (*APIResponse[UsageInfo], error) {
 	return &response, nil
 }
 
-// handleErrorResponse converts HTTP error responses to appropriate Go errors
+// handleErrorResponse converts HTTP error responses to appropriate Go errors. The API's
+// error_detail.code decides the type when present (two different codes share HTTP 429); the
+// HTTP status decides for older responses without it.
 func handleErrorResponse(resp *resty.Response) error {
 	statusCode := resp.StatusCode()
 
 	var errorMsg string
-	if errorResp, ok := resp.Error().(*APIErrorResponse); ok && errorResp.Error != "" {
+	var details ErrorDetails
+	if errorResp, ok := resp.Error().(*APIErrorResponse); ok {
 		errorMsg = errorResp.Error
-	} else {
+		if d := errorResp.ErrorDetail; d != nil {
+			details.Code = d.Code
+			details.Action = d.Action
+			details.DocsURL = d.DocsURL
+			if errorMsg == "" {
+				errorMsg = d.Message
+			}
+		}
+		if errorResp.Meta != nil && errorResp.Meta.RequestID != nil {
+			details.RequestID = *errorResp.Meta.RequestID
+		}
+	}
+	if errorMsg == "" {
 		errorMsg = fmt.Sprintf("HTTP %d: %s", statusCode, http.StatusText(statusCode))
+	}
+	if seconds, err := strconv.Atoi(strings.TrimSpace(resp.Header().Get("Retry-After"))); err == nil && seconds >= 0 {
+		details.RetryAfterSeconds = &seconds
+	}
+
+	if details.Code == "ERR_CREDITS_EXHAUSTED" {
+		return &CreditsExhaustedError{Message: errorMsg, StatusCode: statusCode, ErrorDetails: details}
 	}
 
 	switch statusCode {
 	case 401:
 		return &AuthenticationError{
-			Message:    "Authentication failed. Check your API key.",
-			StatusCode: statusCode,
+			Message:      "Authentication failed. Check your API key.",
+			StatusCode:   statusCode,
+			ErrorDetails: details,
 		}
 	case 404:
 		return &NotFoundError{
-			Message:    "Resource not found",
-			StatusCode: statusCode,
+			Message:      "Resource not found",
+			StatusCode:   statusCode,
+			ErrorDetails: details,
 		}
 	case 422:
 		return &ValidationError{
-			Message:    "Request validation failed. Check your parameters.",
-			StatusCode: statusCode,
+			Message:      "Request validation failed. Check your parameters.",
+			StatusCode:   statusCode,
+			ErrorDetails: details,
 		}
 	case 429:
 		return &RateLimitError{
-			Message:    "Rate limit exceeded. Please slow down your requests.",
-			StatusCode: statusCode,
+			Message:      "Rate limit exceeded. Please slow down your requests.",
+			StatusCode:   statusCode,
+			ErrorDetails: details,
 		}
 	default:
 		return &APIError{
-			Message:    errorMsg,
-			StatusCode: statusCode,
+			Message:      errorMsg,
+			StatusCode:   statusCode,
+			ErrorDetails: details,
 		}
 	}
 }

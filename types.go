@@ -439,5 +439,15 @@ type RemoveBatchResponse struct {
 
 // APIErrorResponse represents an error response from the API
 type APIErrorResponse struct {
-	Error string `json:"error"`
+	Error       string                `json:"error"`
+	ErrorDetail *APIErrorResponseBody `json:"error_detail,omitempty"`
+	Meta        *APIMeta              `json:"meta,omitempty"`
+}
+
+// APIErrorResponseBody is the structured error_detail object of an error response
+type APIErrorResponseBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Action  string `json:"action"`
+	DocsURL string `json:"docs_url"`
 }

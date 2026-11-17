@@ -16,7 +16,7 @@ The official SDK for the [ShopSavvy Data API](https://shopsavvy.com/data) in Go 
 
 - `client.go`: `NewClient`, options and one method per endpoint; `Version` constant
 - `types.go`: request/response types
-- `errors.go`: typed API errors
+- `errors.go`: typed API errors; each embeds `ErrorDetails` (`Code`, `Action`, `DocsURL`, `RequestID`, `RetryAfterSeconds`). `CreditsExhaustedError` (ERR_CREDITS_EXHAUSTED) is deliberately not a `RateLimitError`
 - `*_test.go` + `testdata/`: tests and recorded fixtures
 
 ## Commands
@@ -41,7 +41,7 @@ gofmt -l .   # must print nothing
 - Map errors from `error_detail.code` (`ERR_AUTH_MISSING`, `ERR_RATE_LIMIT`, `ERR_CREDITS_EXHAUSTED`, ...), not from the HTTP status: two different codes share 429. Surface `Retry-After` on `ERR_RATE_LIMIT`.
 - Authenticate with `Authorization: Bearer <key>`. Examples and docs read the key from the `SHOPSAVVY_API_KEY` environment variable.
 - Functional options (`WithBaseURL`, `WithTimeout`) for configuration; keep `NewClient(apiKey, ...Option)` as the entry point.
-- Return typed errors from `errors.go`; never panic on an API error.
+- Never add automatic retries; callers decide. Return typed errors from `errors.go`; never panic on an API error.
 - Version lives in `Version` in `client.go`, then a `vX.Y.Z` git tag (tags are the release). Bump it in the same change as any public API change.
 
 ## Testing
