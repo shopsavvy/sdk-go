@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-shopsavvy.com-blue)](https://shopsavvy.com/data/documentation)
 
-Official Go SDK for the [ShopSavvy Data API](https://shopsavvy.com/data). Access comprehensive product data, real-time pricing, and historical price trends across **tens of thousands of retailers** and **30M+ products**.
+Official Go SDK for the [ShopSavvy Data API](https://shopsavvy.com/data). Access product data, real-time pricing, and historical price trends across **tens of thousands of retailers** and **30M+ products**.
 
 ### In-Store Prices (user-collected)
 
@@ -23,36 +23,45 @@ for _, inStore := range resp.Data[0].InStorePrices {
 
 ## ⚡ 30-Second Quick Start
 
-```go
-// Install
-// go get github.com/shopsavvy/sdk-go
+Set `SHOPSAVVY_API_KEY` to your key, then:
 
-// Use
+```go
 package main
 
 import (
-    "fmt"
-    "log"
-    "github.com/shopsavvy/sdk-go"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/shopsavvy/sdk-go"
 )
 
 func main() {
-    client, _ := shopsavvy.NewClient("ss_live_your_api_key_here")
-    defer client.Close()
-    
-    product, _ := client.GetProductDetails("012345678901")
-    offers, _ := client.GetCurrentOffers("012345678901", "")
-    
-    bestPrice := offers.Data[0].Price
-    bestRetailer := offers.Data[0].Retailer
-    for _, offer := range offers.Data {
-        if offer.Price < bestPrice {
-            bestPrice = offer.Price
-            bestRetailer = offer.Retailer
-        }
-    }
-    
-    fmt.Printf("%s - Best price: $%.2f at %s\n", product.Data.Name, bestPrice, bestRetailer)
+	client, err := shopsavvy.NewClient(os.Getenv("SHOPSAVVY_API_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// 611247373064 is a Keurig K-Mini
+	resp, err := client.GetCurrentOffers("611247373064", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var best *shopsavvy.Offer
+	for _, product := range resp.Data {
+		for i := range product.Offers {
+			offer := &product.Offers[i]
+			if offer.Price != nil && (best == nil || *offer.Price < *best.Price) {
+				best = offer
+			}
+		}
+	}
+	if best == nil || best.Retailer == nil {
+		log.Fatal("no priced offers found")
+	}
+	fmt.Printf("Cheapest: $%.2f at %s\n", *best.Price, *best.Retailer)
 }
 ```
 
@@ -66,10 +75,40 @@ go get github.com/shopsavvy/sdk-go
 
 ### Get Your API Key
 
-1. **Sign up**: Visit [shopsavvy.com/data](https://shopsavvy.com/data)
-2. **Choose plan**: Select based on your usage needs  
-3. **Get API key**: Copy from your dashboard
-4. **Test**: Run the 30-second example above
+Get an API key at [shopsavvy.com/data/api-keys](https://shopsavvy.com/data/api-keys) after starting a plan, then export it as `SHOPSAVVY_API_KEY` and run the 30-second example above.
+
+## Errors, rate limits and credits
+
+Every API error is a typed error that embeds `ErrorDetails`: `Code` (for example `ERR_RATE_LIMIT`), `Action` (a one-line fix), `DocsURL`, `RequestID`, `StatusCode` and `RetryAfterSeconds` (a `*int` parsed from the `Retry-After` header, nil if absent). Fields are empty when an older server did not send them.
+
+Two different problems both arrive as HTTP 429, so they are two types: `*RateLimitError` means wait and retry, `*CreditsExhaustedError` means stop (credits return when the billing period resets or the plan is upgraded). The SDK never retries for you.
+
+```go
+resp, err := client.GetCurrentOffers("611247373064", "")
+var rl *shopsavvy.RateLimitError
+var ce *shopsavvy.CreditsExhaustedError
+switch {
+case errors.As(err, &rl):
+	wait := 1
+	if rl.RetryAfterSeconds != nil {
+		wait = *rl.RetryAfterSeconds
+	}
+	time.Sleep(time.Duration(wait) * time.Second)
+	resp, err = client.GetCurrentOffers("611247373064", "") // retry once
+case errors.As(err, &ce):
+	log.Fatalf("Credits exhausted, not retrying: %s (%s)", ce.Action, ce.DocsURL)
+}
+if err != nil {
+	var apiErr *shopsavvy.APIError
+	if errors.As(err, &apiErr) {
+		log.Fatalf("%s: %s (%s)", apiErr.Code, apiErr.Action, apiErr.DocsURL)
+	}
+	log.Fatal(err)
+}
+_ = resp
+```
+
+Error codes are listed at [shopsavvy.com/data/documentation/errors](https://shopsavvy.com/data/documentation/errors).
 
 ## 📖 Complete API Reference
 
@@ -554,4 +593,4 @@ Plans and the 14-day trial are at [shopsavvy.com/data](https://shopsavvy.com/dat
 
 ---
 
-**Ready to get started?** [Sign up for your API key](https://shopsavvy.com/data) • **Need help?** [Contact us](mailto:business@shopsavvy.com)
+**Ready to get started?** [Get an API key](https://shopsavvy.com/data/api-keys) • **Need help?** [Contact us](mailto:business@shopsavvy.com)
